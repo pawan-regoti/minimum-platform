@@ -7,6 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROVIDERS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG_LOCAL_FILE="$PROVIDERS_DIR/config.local.json"
 CONFIG_FILE="$PROVIDERS_DIR/config.json"
+CONFIG_READER="$PROVIDERS_DIR/utils/read-cluster-management-plane-name.py"
 
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -29,25 +30,7 @@ load_config_if_needed() {
 
   if [[ -n "$source_file" ]]; then
     require_cmd python3
-    CLUSTER_MANAGEMENT_PLANE_NAME="$(python3 - "$source_file" <<'PY'
-import json
-import sys
-
-path = sys.argv[1]
-try:
-  with open(path, 'r', encoding='utf-8') as f:
-    data = json.load(f)
-except Exception:
-  data = {}
-
-value = data.get('clusterManagementPlaneName', '')
-if not value:
-  value = data.get('CLUSTER_MANAGEMENT_PLANE_NAME', '')
-if value is None:
-  value = ''
-print(str(value))
-PY
-)"
+    CLUSTER_MANAGEMENT_PLANE_NAME="$(python3 "$CONFIG_READER" "$source_file")"
   fi
 }
 

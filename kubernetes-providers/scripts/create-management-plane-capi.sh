@@ -23,6 +23,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROVIDERS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG_LOCAL_FILE="$PROVIDERS_DIR/config.local.json"
 CONFIG_FILE="$PROVIDERS_DIR/config.json"
+CONFIG_READER="$PROVIDERS_DIR/utils/read-cluster-management-plane-name.py"
+KIND_CONFIG_FILE="$PROVIDERS_DIR/manifests/kind-management-cluster.yml"
 
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -46,25 +48,7 @@ load_config_if_needed() {
 
   if [[ -n "$source_file" ]]; then
     require_cmd python3
-    CLUSTER_MANAGEMENT_PLANE_NAME="$(python3 - "$source_file" <<'PY'
-import json
-import sys
-
-path = sys.argv[1]
-try:
-  with open(path, 'r', encoding='utf-8') as f:
-    data = json.load(f)
-except Exception:
-  data = {}
-
-value = data.get('clusterManagementPlaneName', '')
-if not value:
-  value = data.get('CLUSTER_MANAGEMENT_PLANE_NAME', '')
-if value is None:
-  value = ''
-print(str(value))
-PY
-)"
+    CLUSTER_MANAGEMENT_PLANE_NAME="$(python3 "$CONFIG_READER" "$source_file")"
   fi
 }
 
@@ -93,20 +77,12 @@ create_kind_cluster_with_docker_sock() {
 
   # CAPD controllers need to reach the local Docker daemon. The simplest approach is
   # mounting /var/run/docker.sock into the kind node container.
-  local cfg
-  cfg="$(mktemp)"
-  cat >"$cfg" <<'YAML'
-kind: Cluster
-apiVersion: kind.x-k8s.io/v1alpha4
-nodes:
-  - role: control-plane
-    extraMounts:
-      - hostPath: /var/run/docker.sock
-        containerPath: /var/run/docker.sock
-YAML
+  if [[ ! -f "$KIND_CONFIG_FILE" ]]; then
+    echo "Missing kind config file: $KIND_CONFIG_FILE" >&2
+    exit 1
+  fi
 
-  kind create cluster --name "$name" --config "$cfg"
-  rm -f "$cfg"
+  kind create cluster --name "$name" --config "$KIND_CONFIG_FILE"
 }
 
 install_capi_docker_provider() {

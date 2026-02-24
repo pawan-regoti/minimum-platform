@@ -8,11 +8,19 @@ This uses:
 - the **Docker infrastructure provider (CAPD)** so the management plane can create “Docker-backed” workload clusters
 
 ### prerequisites
-- Docker runtime (Docker Desktop or Colima)
+- Docker runtime (Docker Desktop, Rancher Desktop or Colima)
 - `kubectl`, `kind`, `clusterctl`
 
 Install (macOS):
 - `brew install kubectl kind clusterctl`
+
+Install (Linux - Ubuntu/Debian):
+- `sudo apt-get update && sudo apt-get install -y curl ca-certificates`
+- `curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && rm -f kubectl`
+- `curl -Lo ./kind "https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64" && chmod +x ./kind && sudo mv ./kind /usr/local/bin/kind`
+- `curl -L "https://github.com/kubernetes-sigs/cluster-api/releases/latest/download/clusterctl-linux-amd64" -o clusterctl && chmod +x clusterctl && sudo mv clusterctl /usr/local/bin/clusterctl`
+
+If you are on Linux ARM64, replace `amd64` with `arm64` in the URLs above.
 
 ### create the management plane
 - `chmod +x scripts/create-management-plane-capi.sh scripts/delete-management-plane-capi.sh`
