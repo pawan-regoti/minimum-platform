@@ -51,6 +51,40 @@ create_one() {
     | kubectl --kubeconfig "$mgmt_kubeconfig" apply -f -
 }
 
+wait_for_webhooks() {
+  local mgmt_kubeconfig="$1"
+
+  # Creating workload objects can trigger conversion/admission webhooks.
+  # If we race them, the API server returns connection refused.
+  local urls=(
+    "https://capi-webhook-service.capi-system.svc:443/"
+    "https://capi-kubeadm-bootstrap-webhook-service.capi-kubeadm-bootstrap-system.svc:443/"
+    "https://capi-kubeadm-control-plane-webhook-service.capi-kubeadm-control-plane-system.svc:443/"
+    "https://capd-webhook-service.capd-system.svc:443/"
+  )
+
+  echo "Waiting for CAPI/CAPD webhooks to be reachable..." >&2
+
+  local attempt
+  for attempt in {1..30}; do
+    if kubectl --kubeconfig "$mgmt_kubeconfig" run capi-webhook-check \
+      --rm -i --restart=Never \
+      --image=curlimages/curl:8.5.0 \
+      --command -- sh -c "set -e; for u in ${urls[*]}; do curl -sk -m 5 -o /dev/null \"\$u\"; done" \
+      >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+  done
+
+  echo "Timed out waiting for webhooks. Check provider pods:" >&2
+  echo "  kubectl --kubeconfig $mgmt_kubeconfig -n capd-system get pods" >&2
+  echo "  kubectl --kubeconfig $mgmt_kubeconfig -n capi-system get pods" >&2
+  echo "  kubectl --kubeconfig $mgmt_kubeconfig -n capi-kubeadm-bootstrap-system get pods" >&2
+  echo "  kubectl --kubeconfig $mgmt_kubeconfig -n capi-kubeadm-control-plane-system get pods" >&2
+  return 1
+}
+
 main() {
   require_cmd kind
   require_cmd kubectl
@@ -98,6 +132,8 @@ main() {
   # Don't reference a local var in an EXIT trap under `set -u`.
   trap "rm -f '$tmp_kubeconfig'" EXIT
   kind get kubeconfig --name "$MGMT_NAME" >"$tmp_kubeconfig"
+
+  wait_for_webhooks "$tmp_kubeconfig"
 
   echo "Creating local workload clusters from management plane: kind-$MGMT_NAME"
 
