@@ -77,3 +77,8 @@
     - database
       - mssql
       - postgres
+
+---
+Local Kubernetes multi-management-plane setups are documented in:
+- [kubernetes-providers/documentation/README.md](kubernetes-providers/documentation/README.md)
+
