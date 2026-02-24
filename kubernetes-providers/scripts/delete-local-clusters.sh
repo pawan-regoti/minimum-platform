@@ -76,7 +76,8 @@ main() {
 
   local tmp_kubeconfig
   tmp_kubeconfig="$(mktemp)"
-  trap 'rm -f "$tmp_kubeconfig"' EXIT
+  # Don't reference a local var in an EXIT trap under `set -u`.
+  trap "rm -f '$tmp_kubeconfig'" EXIT
   kind get kubeconfig --name "$MGMT_NAME" >"$tmp_kubeconfig"
 
   for region in $AWS_REGIONS; do
