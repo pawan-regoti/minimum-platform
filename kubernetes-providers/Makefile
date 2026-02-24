@@ -21,6 +21,8 @@ help:
 	@echo "  managed-deploy    mgmt-up + managed-init + managed-up"
 	@echo "  managed-destroy   managed-down + mgmt-down"
 	@echo ""
+	@echo "  kubeconfig-merge  Merge mgmt kubeconfig into ~/.kube/config"
+	@echo ""
 	@echo "  net-up            Apply private networking full-mesh (requires creds/key material)"
 	@echo "  net-down          Destroy private networking full-mesh (requires creds/key material)"
 	@echo ""
@@ -59,6 +61,10 @@ managed-down:
 managed-deploy: mgmt-up managed-init managed-up
 
 managed-destroy: managed-down mgmt-down
+
+.PHONY: kubeconfig-merge
+kubeconfig-merge:
+	@$(SCRIPTS)/merge-management-kubeconfig.sh
 
 .PHONY: net-up net-down
 net-up:
