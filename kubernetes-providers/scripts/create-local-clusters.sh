@@ -11,6 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROVIDERS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 ENV_EMITTER="$PROVIDERS_DIR/utils/emit-envs.py"
 CAPD_TEMPLATE="$PROVIDERS_DIR/manifests/capd/cluster-template.yaml"
+JSON_ARRAY_TO_WORDS="$PROVIDERS_DIR/utils/json-array-to-words.py"
 
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -26,21 +27,7 @@ json_array_to_words() {
     return 0
   fi
 
-  python3 - <<'PY' "$json_array"
-import json
-import sys
-
-raw = sys.argv[1]
-try:
-    data = json.loads(raw)
-except Exception:
-    data = []
-
-if isinstance(data, list):
-    parts = [str(x).strip() for x in data if str(x).strip()]
-    if parts:
-        sys.stdout.write(" ".join(parts))
-PY
+  python3 "$JSON_ARRAY_TO_WORDS" "$json_array"
 }
 
 render_name() {
@@ -72,6 +59,11 @@ main() {
 
   if [[ ! -f "$ENV_EMITTER" ]]; then
     echo "Missing env emitter: $ENV_EMITTER" >&2
+    exit 1
+  fi
+
+  if [[ ! -f "$JSON_ARRAY_TO_WORDS" ]]; then
+    echo "Missing JSON helper: $JSON_ARRAY_TO_WORDS" >&2
     exit 1
   fi
 
