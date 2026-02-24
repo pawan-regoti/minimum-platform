@@ -117,10 +117,11 @@ main() {
   done
 
   echo "Submitted all local clusters. Watch provisioning with:"
-  echo "  kubectl --kubeconfig $tmp_kubeconfig get clusters -A"
-  echo "  kubectl --kubeconfig $tmp_kubeconfig get machines -A"
+  echo "  kind get kubeconfig --name $MGMT_NAME > /tmp/mgmt.kubeconfig"
+  echo "  kubectl --kubeconfig /tmp/mgmt.kubeconfig get clusters -A"
+  echo "  kubectl --kubeconfig /tmp/mgmt.kubeconfig get machines -A"
   echo "Get a workload kubeconfig (once ready) with:"
-  echo "  clusterctl get kubeconfig <cluster-name> --kubeconfig $tmp_kubeconfig"
+  echo "  clusterctl get kubeconfig <cluster-name> --kubeconfig /tmp/mgmt.kubeconfig > <cluster-name>.kubeconfig"
 }
 
 main "$@"

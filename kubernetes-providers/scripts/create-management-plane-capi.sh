@@ -123,6 +123,45 @@ wait_for_capi() {
   done
 
   kubectl --context "$ctx" -n capi-system rollout status deploy/capi-controller-manager --timeout=300s
+
+  # Creating workload clusters triggers admission webhooks. Ensure all provider
+  # deployments (including webhooks) are ready before returning.
+  local namespaces=(
+    cert-manager
+    capi-system
+    capi-kubeadm-bootstrap-system
+    capi-kubeadm-control-plane-system
+    capd-system
+  )
+
+  local ns
+  for ns in "${namespaces[@]}"; do
+    for _ in {1..60}; do
+      if kubectl --context "$ctx" get ns "$ns" >/dev/null 2>&1; then
+        break
+      fi
+      sleep 2
+    done
+
+    # Wait for deployments (including webhook deployments) in the namespace.
+    # We can't rely on `kubectl rollout status --all` across kubectl versions.
+    local deployments=""
+    for _ in {1..60}; do
+      deployments="$(kubectl --context "$ctx" -n "$ns" get deploy -o name 2>/dev/null || true)"
+      if [[ -n "$deployments" ]]; then
+        break
+      fi
+      sleep 2
+    done
+
+    if [[ -n "$deployments" ]]; then
+      local d
+      while IFS= read -r d; do
+        [[ -z "$d" ]] && continue
+        kubectl --context "$ctx" -n "$ns" rollout status "$d" --timeout=300s
+      done <<<"$deployments"
+    fi
+  done
 }
 
 main() {
