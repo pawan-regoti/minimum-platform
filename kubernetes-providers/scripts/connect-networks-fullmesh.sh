@@ -3,14 +3,14 @@ set -euo pipefail
 
 # Provisions full-mesh private connectivity between AWS/Azure/GCP using Terraform.
 #
-# This reads secrets from config.local.json via utils/emit-managed-env.py.
+# This reads secrets from config.local.json via utils/emit-envs.py.
 # Secrets expected (as exports):
 # - WG_* keys described in networking/README.md
 # - AWS/Azure/GCP provider credentials (or provide them via your shell environment)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}" )" && pwd)"
 PROVIDERS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-ENV_EMITTER="$PROVIDERS_DIR/utils/emit-managed-env.py"
+ENV_EMITTER="$PROVIDERS_DIR/utils/emit-envs.py"
 
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then

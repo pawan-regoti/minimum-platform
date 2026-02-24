@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Emit environment variables for managed cluster scripts.
+"""Emit environment variables for scripts.
 
 Reads and merges (in order):
   1) config.json (committed defaults)
@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 from typing import Any, Dict, List
 
 
@@ -30,11 +29,7 @@ def _read_json(path: str) -> Dict[str, Any]:
 def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
     result: Dict[str, Any] = dict(base)
     for key, value in override.items():
-        if (
-            key in result
-            and isinstance(result[key], dict)
-            and isinstance(value, dict)
-        ):
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
             result[key] = _deep_merge(result[key], value)
         else:
             result[key] = value
@@ -75,6 +70,69 @@ def _emit(name: str, value: str) -> None:
     print(f'export {name}="{safe}"')
 
 
+def _to_env_value(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (dict, list, bool, int, float)):
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    return str(value)
+
+
+def _normalize_env_segment(segment: str) -> str:
+    # Turn camelCase / kebab-case / weird keys into ENV_SAFE uppercase.
+    out: List[str] = []
+    prev_underscore = False
+    for idx, ch in enumerate(segment):
+        if "a" <= ch <= "z":
+            out.append(ch.upper())
+            prev_underscore = False
+            continue
+        if "A" <= ch <= "Z":
+            # Insert underscore for camelCase boundaries.
+            if idx > 0 and not prev_underscore and out and out[-1] != "_":
+                out.append("_")
+            out.append(ch)
+            prev_underscore = False
+            continue
+        if "0" <= ch <= "9":
+            out.append(ch)
+            prev_underscore = False
+            continue
+        if not prev_underscore:
+            out.append("_")
+            prev_underscore = True
+
+    normalized = "".join(out).strip("_")
+    while "__" in normalized:
+        normalized = normalized.replace("__", "_")
+    return normalized or "KEY"
+
+
+def _emit_all_config(prefix: str, value: Any, path: List[str] | None = None) -> None:
+    path = [] if path is None else path
+
+    # Dict: recurse
+    if isinstance(value, dict):
+        for k, v in value.items():
+            seg = _normalize_env_segment(str(k))
+            _emit_all_config(prefix, v, [*path, seg])
+        return
+
+    # List: emit as JSON for the whole list
+    if isinstance(value, list):
+        name = prefix + ("_" + "_".join(path) if path else "")
+        _emit(name, _to_env_value(value))
+        return
+
+    # Scalar: emit
+    if value is None:
+        return
+    name = prefix + ("_" + "_".join(path) if path else "")
+    _emit(name, _to_env_value(value))
+
+
 def main() -> int:
     repo_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     config_path = os.path.join(repo_dir, "config.json")
@@ -84,28 +142,14 @@ def main() -> int:
     local = _read_json(local_path)
     merged = _deep_merge(base, local)
 
-    mgmt = _get_str(merged, "clusterManagementPlaneName", "capi-mgmt-1")
-    _emit("CLUSTER_MANAGEMENT_PLANE_NAME", mgmt)
-    _emit("CAPI_MGMT_CONTEXT", f"kind-{mgmt}")
+    # Emit full merged config as flattened CONFIG_* variables.
+    _emit_all_config("CONFIG", merged)
 
-    managed = _get_obj(merged, "managedClusters")
-    _emit("MANAGED_KUBERNETES_VERSION", str(managed.get("kubernetesVersion", "v1.29.0")).strip())
-
-    aws = managed.get("aws", {}) if isinstance(managed.get("aws"), dict) else {}
-    azure = managed.get("azure", {}) if isinstance(managed.get("azure"), dict) else {}
-    gcp = managed.get("gcp", {}) if isinstance(managed.get("gcp"), dict) else {}
-
-    _emit("MANAGED_AWS_FLAVOR", str(aws.get("flavor", "CHANGE_ME")).strip())
-    _emit("MANAGED_AWS_REGIONS", " ".join(_as_list(aws.get("regions"))))
-    _emit("MANAGED_AWS_NAME_PATTERN", str(aws.get("clusterNamePattern", "eks-<region>-1")).strip())
-
-    _emit("MANAGED_AZURE_FLAVOR", str(azure.get("flavor", "CHANGE_ME")).strip())
-    _emit("MANAGED_AZURE_LOCATIONS", " ".join(_as_list(azure.get("locations"))))
-    _emit("MANAGED_AZURE_NAME_PATTERN", str(azure.get("clusterNamePattern", "aks-<region>-1")).strip())
-
-    _emit("MANAGED_GCP_FLAVOR", str(gcp.get("flavor", "CHANGE_ME")).strip())
-    _emit("MANAGED_GCP_REGIONS", " ".join(_as_list(gcp.get("regions"))))
-    _emit("MANAGED_GCP_NAME_PATTERN", str(gcp.get("clusterNamePattern", "gke-<region>-1")).strip())
+    # Optional convenience export: lets users override scripts by exporting a single var.
+    # Scripts no longer rely on this being present.
+    mgmt = _get_str(merged, "clusterManagementPlaneName", "")
+    if mgmt:
+        _emit("CLUSTER_MANAGEMENT_PLANE_NAME", mgmt)
 
     # Optional secrets (you asked to keep them in config.local.json). These keys are intentionally
     # simple and map 1:1 to common env var names used by provider templates.

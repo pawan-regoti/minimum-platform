@@ -5,9 +5,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROVIDERS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-CONFIG_LOCAL_FILE="$PROVIDERS_DIR/config.local.json"
-CONFIG_FILE="$PROVIDERS_DIR/config.json"
-CONFIG_READER="$PROVIDERS_DIR/utils/read-cluster-management-plane-name.py"
+ENV_EMITTER="$PROVIDERS_DIR/utils/emit-envs.py"
 
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -21,16 +19,17 @@ load_config_if_needed() {
     return 0
   fi
 
-  local source_file=""
-  if [[ -f "$CONFIG_LOCAL_FILE" ]]; then
-    source_file="$CONFIG_LOCAL_FILE"
-  elif [[ -f "$CONFIG_FILE" ]]; then
-    source_file="$CONFIG_FILE"
+  if [[ ! -f "$ENV_EMITTER" ]]; then
+    echo "Missing env emitter: $ENV_EMITTER" >&2
+    exit 1
   fi
 
-  if [[ -n "$source_file" ]]; then
-    require_cmd python3
-    CLUSTER_MANAGEMENT_PLANE_NAME="$(python3 "$CONFIG_READER" "$source_file")"
+  require_cmd python3
+  # shellcheck disable=SC1090
+  eval "$(python3 "$ENV_EMITTER")"
+
+  if [[ -z "${CLUSTER_MANAGEMENT_PLANE_NAME:-}" ]]; then
+    CLUSTER_MANAGEMENT_PLANE_NAME="${CONFIG_CLUSTER_MANAGEMENT_PLANE_NAME:-}"
   fi
 }
 
