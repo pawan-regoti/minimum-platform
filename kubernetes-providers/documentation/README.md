@@ -33,11 +33,35 @@ The script creates:
 To change the management cluster name locally, create or edit `config.local.json`:
 - `{ "clusterManagementPlaneName": "my-mgmt" }`
 
-### optional: create a workload cluster from the management plane
+### local workload clusters (stand-in for EKS / AKS / GKE)
 
-Example (use your management context):
-- `clusterctl generate cluster wc-1 --kubernetes-version v1.29.0 --control-plane-machine-count 1 --worker-machine-count 1 | kubectl --context kind-<clusterManagementPlaneName> apply -f -`
-- `clusterctl --context kind-<clusterManagementPlaneName> get kubeconfig wc-1 > wc-1.kubeconfig`
+If you don’t have cloud provider accounts yet, you can still create workload clusters locally (Docker-backed) from the CAPI management plane.
+
+These clusters:
+- use **CAPD** (Docker infrastructure provider)
+- are named using the same patterns in [kubernetes-providers/config.json](../config.json) (`managedClusters.*.clusterNamePattern`), e.g. `eks-us-east-1-1`, `aks-eastus-1`, `gke-us-east4-1`
+
+Create them:
+- `chmod +x scripts/create-local-clusters.sh scripts/delete-local-clusters.sh`
+- `./scripts/create-local-clusters.sh`
+
+Delete them:
+- `./scripts/delete-local-clusters.sh`
+
+Get a workload kubeconfig (once the cluster is provisioned):
+- `kind get kubeconfig --name <clusterManagementPlaneName> > /tmp/mgmt.kubeconfig`
+- `clusterctl get kubeconfig <workload-cluster-name> --kubeconfig /tmp/mgmt.kubeconfig > <workload-cluster-name>.kubeconfig`
+
+Note: the local flow uses a vendored CAPD workload template at `manifests/capd/cluster-template.yaml` to avoid any `clusterctl generate` downloads.
+
+### optional: create a workload cluster manually
+
+If you prefer creating a single workload cluster manually (instead of via the script), use the vendored template:
+
+Example:
+- `kind get kubeconfig --name <clusterManagementPlaneName> > /tmp/mgmt.kubeconfig`
+- `clusterctl generate cluster wc-1 --from manifests/capd/cluster-template.yaml --kubeconfig /tmp/mgmt.kubeconfig --kubernetes-version v1.29.0 --control-plane-machine-count 1 --worker-machine-count 1 | kubectl --kubeconfig /tmp/mgmt.kubeconfig apply -f -`
+- `clusterctl get kubeconfig wc-1 --kubeconfig /tmp/mgmt.kubeconfig > wc-1.kubeconfig`
 
 ### delete
 - `./scripts/delete-management-plane-capi.sh`
@@ -47,6 +71,8 @@ Example (use your management context):
 ## managed clusters (EKS / AKS / GKE)
 
 Create managed Kubernetes clusters in cloud providers from the local CAPI management plane.
+
+If you don’t have cloud accounts, use the **local workload clusters** flow above instead.
 
 ### notes
 - These scripts submit Cluster API objects to the management cluster (`kind-<clusterManagementPlaneName>`).
@@ -61,6 +87,8 @@ You can list available flavors after installing providers:
 
 Credentials (your preference): you can store secrets in `config.local.json` under a `secrets` object.
 
+`./scripts/init-managed-providers.sh` runs a preflight check and will fail fast if required variables are missing.
+
 Example structure (do not commit):
 
 ```json
@@ -72,8 +100,7 @@ Example structure (do not commit):
 		"gcp": { "flavor": "<your-gke-managed-flavor>" }
 	},
 	"secrets": {
-		"AWS_ACCESS_KEY_ID": "...",
-		"AWS_SECRET_ACCESS_KEY": "...",
+		"AWS_B64ENCODED_CREDENTIALS": "<base64(~/.aws/credentials)>" ,
 		"AZURE_SUBSCRIPTION_ID": "...",
 		"AZURE_TENANT_ID": "...",
 		"AZURE_CLIENT_ID": "...",
@@ -83,6 +110,8 @@ Example structure (do not commit):
 	}
 }
 ```
+
+Tip: there is a local template at [kubernetes-providers/config.local.json](../config.local.json) (gitignored) you can fill in.
 
 ### 2) create management plane
 - `./scripts/create-management-plane-capi.sh`
