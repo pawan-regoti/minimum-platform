@@ -72,6 +72,9 @@ Troubleshooting:
 Delete them:
 - `./scripts/delete-local-clusters.sh`
 
+To remove the context configuration from kubectl
+- `kubectl config delete-context <context-name>`
+
 You can see the merged contexts with:
 - `kubectl config get-contexts`
 
