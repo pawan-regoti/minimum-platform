@@ -100,6 +100,7 @@ main() {
   ensure_flavor_set "$GCP_FLAVOR" "GCP"
 
   local created=()
+  local name
 
   # EKS
   for region in $AWS_REGIONS; do
@@ -127,7 +128,7 @@ main() {
 
   if (( ${#created[@]} > 0 )); then
     if [[ -f "$MERGE_WORKLOAD_KUBECONFIG_SCRIPT" ]]; then
-      echo "Merging workload kubeconfigs into ~/.kube/config (waits for Ready)..." >&2
+      echo "Merging workload kubeconfigs into ~/.kube/config (waits for workload availability; context name becomes <cluster-name>)..." >&2
       bash "$MERGE_WORKLOAD_KUBECONFIG_SCRIPT" "${created[@]}"
     else
       echo "Warning: merge script not found: $MERGE_WORKLOAD_KUBECONFIG_SCRIPT" >&2
