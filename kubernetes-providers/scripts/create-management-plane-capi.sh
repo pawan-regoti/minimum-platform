@@ -23,6 +23,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROVIDERS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 ENV_EMITTER="$PROVIDERS_DIR/utils/emit-envs.py"
 KIND_CONFIG_FILE="$PROVIDERS_DIR/manifests/kind-management-cluster.yml"
+MERGE_MGMT_KUBECONFIG_SCRIPT="$SCRIPT_DIR/merge-management-kubeconfig.sh"
 
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -169,6 +170,7 @@ main() {
   require_cmd kubectl
   require_cmd kind
   require_cmd clusterctl
+  require_cmd bash
 
   create_kind_cluster_with_docker_sock "$MGMT_CLUSTER_NAME"
 
@@ -176,6 +178,14 @@ main() {
 
   install_capi_docker_provider "$ctx" "$MGMT_CLUSTER_NAME"
   wait_for_capi "$ctx"
+
+  if [[ -f "$MERGE_MGMT_KUBECONFIG_SCRIPT" ]]; then
+    echo "Merging management kubeconfig into ~/.kube/config" >&2
+    bash "$MERGE_MGMT_KUBECONFIG_SCRIPT"
+  else
+    echo "Warning: merge script not found: $MERGE_MGMT_KUBECONFIG_SCRIPT" >&2
+    echo "You can merge manually with: ./scripts/merge-management-kubeconfig.sh" >&2
+  fi
 
   echo "Ready management plane: $MGMT_CLUSTER_NAME"
   echo "Context: $ctx"

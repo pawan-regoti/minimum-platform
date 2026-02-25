@@ -3,17 +3,17 @@
   "managedClusters": {
     "kubernetesVersion": "v1.29.0",
     "aws": {
-      "regions": ["us-east-1", "eu-west-1"],
+      "regions": [],
       "clusterNamePattern": "eks-<region>-1",
       "flavor": "CHANGE_ME"
     },
     "azure": {
-      "locations": ["eastus", "westeurope"],
+      "locations": ["eastus"],
       "clusterNamePattern": "aks-<region>-1",
       "flavor": "CHANGE_ME"
     },
     "gcp": {
-      "regions": ["us-east4", "europe-west1"],
+      "regions": [],
       "clusterNamePattern": "gke-<region>-1",
       "flavor": "CHANGE_ME"
     }

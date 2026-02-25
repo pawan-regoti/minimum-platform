@@ -1,0 +1,10 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "egrep": true,
+        "kubectl --context kind-capi-mgmt-1": true,
+        "kubectl explain": true,
+        "kubectl -n default": true,
+        "true": true,
+        "kubectl -n capd-system": true
+    }
+}

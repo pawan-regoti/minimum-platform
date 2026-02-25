@@ -13,6 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROVIDERS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 ENV_EMITTER="$PROVIDERS_DIR/utils/emit-envs.py"
 JSON_ARRAY_TO_WORDS="$PROVIDERS_DIR/utils/json-array-to-words.py"
+MERGE_WORKLOAD_KUBECONFIG_SCRIPT="$SCRIPT_DIR/merge-workload-kubeconfig.sh"
 
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -64,6 +65,7 @@ main() {
   require_cmd kubectl
   require_cmd clusterctl
   require_cmd python3
+  require_cmd bash
 
   if [[ ! -f "$ENV_EMITTER" ]]; then
     echo "Missing env emitter: $ENV_EMITTER" >&2
@@ -97,11 +99,14 @@ main() {
   ensure_flavor_set "$AZURE_FLAVOR" "Azure"
   ensure_flavor_set "$GCP_FLAVOR" "GCP"
 
+  local created=()
+
   # EKS
   for region in $AWS_REGIONS; do
     export AWS_REGION="$region"
     name="$(render_name "$AWS_NAME_PATTERN" "$region")"
     create_one "$name" "$AWS_FLAVOR" "$KUBE_VERSION" "$MGMT_CONTEXT"
+    created+=("$name")
   done
 
   # AKS
@@ -109,6 +114,7 @@ main() {
     export AZURE_LOCATION="$location"
     name="$(render_name "$AZURE_NAME_PATTERN" "$location")"
     create_one "$name" "$AZURE_FLAVOR" "$KUBE_VERSION" "$MGMT_CONTEXT"
+    created+=("$name")
   done
 
   # GKE
@@ -116,7 +122,18 @@ main() {
     export GCP_REGION="$region"
     name="$(render_name "$GCP_NAME_PATTERN" "$region")"
     create_one "$name" "$GCP_FLAVOR" "$KUBE_VERSION" "$MGMT_CONTEXT"
+    created+=("$name")
   done
+
+  if (( ${#created[@]} > 0 )); then
+    if [[ -f "$MERGE_WORKLOAD_KUBECONFIG_SCRIPT" ]]; then
+      echo "Merging workload kubeconfigs into ~/.kube/config (waits for Ready)..." >&2
+      bash "$MERGE_WORKLOAD_KUBECONFIG_SCRIPT" "${created[@]}"
+    else
+      echo "Warning: merge script not found: $MERGE_WORKLOAD_KUBECONFIG_SCRIPT" >&2
+      echo "You can merge manually with: ./scripts/merge-workload-kubeconfig.sh ${created[*]}" >&2
+    fi
+  fi
 
   echo "Submitted all managed clusters. Watch status with: kubectl --context $MGMT_CONTEXT get clusters -A"
 }

@@ -14,6 +14,7 @@ help:
 	@echo "  local-down        Delete local workload clusters"
 	@echo "  local-deploy      mgmt-up + local-up"
 	@echo "  local-destroy     local-down + mgmt-down"
+	@echo "  local-redeploy    local-down + mgmt-down + mgmt-up + local-up"
 	@echo ""
 	@echo "  managed-init      Install CAPA/CAPZ/CAPG into mgmt plane (requires cloud creds)"
 	@echo "  managed-up        Create EKS/AKS/GKE clusters via CAPI (requires cloud creds + flavors)"
@@ -21,7 +22,8 @@ help:
 	@echo "  managed-deploy    mgmt-up + managed-init + managed-up"
 	@echo "  managed-destroy   managed-down + mgmt-down"
 	@echo ""
-	@echo "  kubeconfig-merge  Merge mgmt kubeconfig into ~/.kube/config"
+	@echo "  kubeconfig-merge  (manual) Merge mgmt kubeconfig into ~/.kube/config"
+	@echo "  kubeconfig-merge-workloads  (manual) Merge workload kubeconfigs into ~/.kube/config"
 	@echo ""
 	@echo "  net-up            Apply private networking full-mesh (requires creds/key material)"
 	@echo "  net-down          Destroy private networking full-mesh (requires creds/key material)"
@@ -37,7 +39,7 @@ mgmt-up:
 mgmt-down:
 	@$(SCRIPTS)/delete-management-plane-capi.sh
 
-.PHONY: local-up local-down local-deploy local-destroy
+.PHONY: local-up local-down local-deploy local-destroy local-redeploy
 local-up:
 	@$(SCRIPTS)/create-local-clusters.sh
 
@@ -47,6 +49,8 @@ local-down:
 local-deploy: mgmt-up local-up
 
 local-destroy: local-down mgmt-down
+
+local-redeploy: local-down mgmt-down mgmt-up local-up
 
 .PHONY: managed-init managed-up managed-down managed-deploy managed-destroy
 managed-init:
@@ -65,6 +69,10 @@ managed-destroy: managed-down mgmt-down
 .PHONY: kubeconfig-merge
 kubeconfig-merge:
 	@$(SCRIPTS)/merge-management-kubeconfig.sh
+
+.PHONY: kubeconfig-merge-workloads
+kubeconfig-merge-workloads:
+	@$(SCRIPTS)/merge-workload-kubeconfig.sh $(CLUSTERS)
 
 .PHONY: net-up net-down
 net-up:

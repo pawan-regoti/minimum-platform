@@ -9,6 +9,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}" )" && pwd)"
 PROVIDERS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 ENV_EMITTER="$PROVIDERS_DIR/utils/emit-envs.py"
+MERGE_HELPER="$PROVIDERS_DIR/scripts/merge-kubeconfigs-into-home.sh"
 
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -24,6 +25,11 @@ main() {
 
   if [[ ! -f "$ENV_EMITTER" ]]; then
     echo "Missing env emitter: $ENV_EMITTER" >&2
+    exit 1
+  fi
+
+  if [[ ! -f "$MERGE_HELPER" ]]; then
+    echo "Missing kubeconfig merge helper: $MERGE_HELPER" >&2
     exit 1
   fi
 
@@ -44,31 +50,7 @@ main() {
   trap "rm -f '$tmp_kind_kubeconfig'" EXIT
   kind get kubeconfig --name "$mgmt_name" >"$tmp_kind_kubeconfig"
 
-  local kube_dir="$HOME/.kube"
-  local target="$kube_dir/config"
-  mkdir -p "$kube_dir"
-
-  if [[ -f "$target" ]]; then
-    local backup="$target.bak-$(date +%Y%m%d-%H%M%S)"
-    cp -p "$target" "$backup"
-    echo "Backed up existing kubeconfig to: $backup" >&2
-  fi
-
-  local merged
-  merged="$(mktemp)"
-
-  if [[ -f "$target" ]]; then
-    KUBECONFIG="$target:$tmp_kind_kubeconfig" kubectl config view --merge --flatten >"$merged"
-  else
-    KUBECONFIG="$tmp_kind_kubeconfig" kubectl config view --flatten >"$merged"
-  fi
-
-  mv "$merged" "$target"
-  chmod 600 "$target" || true
-
-  echo "Merged management kubeconfig into: $target" >&2
-  echo "Available contexts:" >&2
-  kubectl config get-contexts
+  bash "$MERGE_HELPER" "$tmp_kind_kubeconfig"
 }
 
 main "$@"
